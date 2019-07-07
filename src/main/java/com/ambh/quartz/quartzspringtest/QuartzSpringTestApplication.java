@@ -28,15 +28,8 @@ public class QuartzSpringTestApplication {
 	public JobDetail jobDetail() {
 		return JobBuilder.newJob().ofType(SimpleJob.class)
 				.storeDurably()
+				.usingJobData("name", "James")
 				.withIdentity("Q_Job_Detail_1")
-				.build();
-	}
-
-	@Bean
-	public Trigger trigger(JobDetail jobDetail) {
-		return TriggerBuilder.newTrigger().forJob(jobDetail)
-				.withIdentity("Q_Trigger_1")
-				.withSchedule(SimpleScheduleBuilder.simpleSchedule().repeatForever().withIntervalInSeconds(10))
 				.build();
 	}
 
@@ -48,13 +41,22 @@ public class QuartzSpringTestApplication {
 	}
 
 	@Bean
-	public Scheduler scheduler(Trigger trigger, JobDetail jobDetail) throws SchedulerException, IOException {
+	public Scheduler scheduler(JobDetail jobDetail) throws SchedulerException, IOException {
 		StdSchedulerFactory factory = new StdSchedulerFactory();
 		factory.initialize(new ClassPathResource("quartz.properties").getInputStream());
 
 		Scheduler scheduler = factory.getScheduler();
 		scheduler.setJobFactory(springBeanJobFactory());
-		scheduler.scheduleJob(jobDetail, trigger);
+
+		JobKey jobKey = new JobKey("Q_Job_Detail_1");
+
+		if (!scheduler.checkExists(jobKey)) {
+			Trigger trigger = TriggerBuilder.newTrigger()
+					.withIdentity("Q_Trigger_1")
+					.withSchedule(CronScheduleBuilder.cronSchedule("0/10 * * ? * * *"))
+					.build();
+			scheduler.scheduleJob(jobDetail, trigger);
+		}
 
 		scheduler.start();
 
